@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Telegram PDF Bot - Railway.app (HARDCODED VERSION)
+Telegram PDF Bot - Railway.app (FIXED 401)
 """
 
 import os
@@ -9,18 +9,18 @@ import requests
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, CommandHandler, ContextTypes
 
-# ===== HARDCODED CONFIG (DIRECT VALUES) =====
+# ===== CONFIG =====
 BOT_TOKEN = '8463828441:AAExeLSEkpCQre2FaWmLfz1VnTOKV_RGcH8'
-APPS_SCRIPT_URL = 'https://script.google.com/macros/library/d/1iZfbK0WV7rwYV_XKPwKvKUpOAVEOjn5wssG-09nVMQjJzfAR1nU4gW22/7'
+APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwjmz1KIu452RKs1pUMDwBH2ITebn98fDuo79pMLFhBIKzHnyjXtGBbrXRzhCLSva77/exec'  # ← YE CHANGE KARNA!
 YOUR_USER_ID = 1345952228
 
 os.makedirs('downloads', exist_ok=True)
 
 print("="*60)
-print("🤖 PDF BOT - Railway.app (HARDCODED)")
+print("🤖 PDF BOT - Railway.app (v2)")
 print("="*60)
 print(f"✅ Bot Token: {BOT_TOKEN[:10]}...")
-print(f"✅ Apps Script: {APPS_SCRIPT_URL[:40]}...")
+print(f"✅ Apps Script: {APPS_SCRIPT_URL[:50]}...")
 print(f"✅ User ID: {YOUR_USER_ID}")
 print("="*60)
 
@@ -43,9 +43,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     await update.message.reply_text(
-        "👋 **PDF Bot - Railway**\n\n"
+        "👋 **PDF Bot - Railway v2**\n\n"
         "📄 Send PDF → Auto upload!\n"
-        "🤖 Running 24/7 on Railway.app!",
+        "🤖 Running 24/7 on Railway.app!\n\n"
+        "✅ 401 Error Fixed!",
         parse_mode='Markdown'
     )
 
@@ -91,7 +92,8 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
         
-        print("🚀 Calling Apps Script...")
+        print(f"🚀 POST to: {APPS_SCRIPT_URL}")
+        print(f"📦 Payload size: {len(file_base64)} chars")
         
         response = requests.post(
             APPS_SCRIPT_URL,
@@ -105,8 +107,8 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             timeout=180
         )
         
-        print(f"📨 Response: {response.status_code}")
-        print(f"📨 Body: {response.text[:200]}")
+        print(f"📨 Status: {response.status_code}")
+        print(f"📨 Body: {response.text[:500]}")
         
         if response.status_code == 200:
             try:
@@ -123,14 +125,13 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
             except:
                 await update.message.reply_text(
-                    f"✅ **Upload Complete!**\n\n{response.text[:200]}",
+                    f"✅ **Upload Complete!**\n\n{response.text[:300]}",
                     parse_mode='Markdown'
                 )
         else:
-            await update.message.reply_text(
-                f"⚠️ **Status:** {response.status_code}\n\n`{response.text[:200]}`",
-                parse_mode='Markdown'
-            )
+            error_msg = f"⚠️ **Error {response.status_code}**\n\n`{response.text[:300]}`"
+            await update.message.reply_text(error_msg, parse_mode='Markdown')
+            print(f"❌ Error: {response.status_code}")
         
         # Cleanup
         if os.path.exists(file_path):
@@ -138,8 +139,9 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print(f"🗑️ Cleaned: {file_path}\n")
     
     except Exception as e:
-        print(f"❌ Error: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)[:100]}")
+        error_str = str(e)
+        print(f"❌ Exception: {error_str}")
+        await update.message.reply_text(f"❌ Error: {error_str[:200]}")
 
 # ===== MAIN =====
 def main():
@@ -147,6 +149,12 @@ def main():
     print("\n🚀 Starting bot...\n")
     
     clear_webhook()
+    
+    # Validate URL
+    if 'YOUR_NEW' in APPS_SCRIPT_URL:
+        print("❌ ERROR: Update APPS_SCRIPT_URL first!")
+        print("🔗 Get new URL from Apps Script deployment\n")
+        return
     
     # Create app
     app = Application.builder().token(BOT_TOKEN).build()
