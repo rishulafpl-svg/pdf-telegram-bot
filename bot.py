@@ -18,9 +18,7 @@ from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
 BOT_TOKEN = '8463828441:AAExeLSEkpCQre2FaWmLfz1VnTOKV_RGcH8'
 YOUR_USER_ID = 1345952228
-APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxAg_JEoCPxUvVv_2fu6VoHLaMNPcmjvio6Ii5uUUQVwM7_CLyrkoGmw1qhPJEPZkGL/exec'
-
-os.makedirs('downloads', exist_ok=True)
+APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDFo5GpXpmBQHt9KOTxb3uR8AYs0rmmybakKxu69f7rnREIMKB2w-uNtnqm9QB5Awc/exec'
 
 print("="*60)
 print("🤖 PDF BOT - Railway.app")
