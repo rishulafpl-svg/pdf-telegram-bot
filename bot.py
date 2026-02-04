@@ -1,235 +1,140 @@
-#!/usr/bin/env python3
-"""
-Telegram PDF Bot - Railway.app Version
-Auto-uploads PDFs to Google Drive
-"""
-
 import os
-import time
-import asyncio
-import requests
 import base64
+import requests
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-# ============================================
-# CONFIG
-# ============================================
+# ===== CONFIG =====
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+APPS_SCRIPT_URL = os.getenv('APPS_SCRIPT_URL')
 
-BOT_TOKEN = '8463828441:AAExeLSEkpCQre2FaWmLfz1VnTOKV_RGcH8'
-YOUR_USER_ID = 1345952228
-APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDFo5GpXpmBQHt9KOTxb3uR8AYs0rmmybakKxu69f7rnREIMKB2w-uNtnqm9QB5Awc/exec'
+print(f'🔑 Bot Token: {TELEGRAM_TOKEN[:10]}...')
+print(f'🔗 Apps Script URL: {APPS_SCRIPT_URL}')
 
-print("="*60)
-print("🤖 PDF BOT - Railway.app")
-print("="*60)
-print(f"✅ Bot Token: {BOT_TOKEN[:10]}...")
-print(f"✅ User ID: {YOUR_USER_ID}")
-print(f"✅ Apps Script: {APPS_SCRIPT_URL[:50]}...")
-print("="*60 + "\n")
-
-# ============================================
-# HELPER FUNCTIONS
-# ============================================
-
-def clear_bot_conflicts():
-    """Clear webhook and pending updates"""
-    print("🔄 Clearing bot conflicts...")
-    
+async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle PDF documents"""
     try:
-        requests.get(
-            f'https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true',
-            timeout=10
-        )
-        print("✅ Webhook cleared")
-        time.sleep(1)
+        print(f'📥 PDF received from user {update.message.from_user.id}')
+        await update.message.reply_text('📥 PDF Received! Processing...')
         
-        r = requests.get(
-            f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?offset=-1',
-            timeout=10
-        )
+        # Get document
+        document = update.message.document
+        file_name = document.file_name
+        file_size = document.file_size
         
-        if r.status_code == 200:
-            data = r.json()
-            if data.get('result'):
-                latest_id = max([u['update_id'] for u in data['result']]) + 1
-                requests.get(
-                    f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?offset={latest_id}',
-                    timeout=10
-                )
-                print("✅ Cleared pending updates")
+        print(f'📄 File: {file_name} ({file_size} bytes)')
         
-        print("✅ Bot reset complete!\n")
-        
-    except Exception as e:
-        print(f"⚠️ Cleanup warning: {e}\n")
-
-# ============================================
-# TELEGRAM HANDLERS
-# ============================================
-
-async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle PDF uploads"""
-    try:
-        if update.effective_user.id != YOUR_USER_ID:
-            await update.message.reply_text("❌ Unauthorized")
+        # Size check (50 MB limit)
+        if file_size > 50 * 1024 * 1024:
+            await update.message.reply_text('❌ File too large! Max 50 MB.')
             return
         
-        document = update.message.document
-        file_name = document.file_name or f"file_{document.file_id}.pdf"
-        chat_id = update.effective_chat.id
+        await update.message.reply_text(f'📥 Downloading: {file_name}...')
         
-        print(f"\n{'='*60}")
-        print(f"📥 New file: {file_name}")
-        print(f"👤 From: {update.effective_user.id}")
-        print(f"{'='*60}\n")
-        
-        # Step 1: Download
-        status_msg = await update.message.reply_text(
-            f"📥 **Downloading...**\n`{file_name}`",
-            parse_mode='Markdown'
-        )
-        
+        # Download file
         file = await context.bot.get_file(document.file_id)
-        file_path = f"downloads/{file_name}"
-        await file.download_to_drive(file_path)
+        file_bytes = await file.download_as_bytearray()
         
-        print(f"✅ Downloaded: {file_name}")
+        print(f'✅ Downloaded: {len(file_bytes)} bytes')
+        await update.message.reply_text(f'✅ Downloaded: {file_name}\n📦 Size: {len(file_bytes)} bytes')
         
-        # Step 2: Read and encode file
-        with open(file_path, 'rb') as f:
-            file_data = f.read()
+        # Encode to base64
+        print('🔄 Encoding to base64...')
+        file_base64 = base64.b64encode(file_bytes).decode('utf-8')
         
-        file_base64 = base64.b64encode(file_data).decode('utf-8')
-        print(f"📦 Encoded: {len(file_base64)} chars")
+        print(f'✅ Encoded: {len(file_base64)} chars')
+        await update.message.reply_text(f'📦 Encoded: {len(file_base64)} chars')
         
-        # Step 3: Upload to Drive via Apps Script
-        await status_msg.edit_text(
-            f"☁️ **Uploading to Drive...**\n`{file_name}`",
-            parse_mode='Markdown'
+        # Prepare payload
+        payload = {
+            'trigger': 'upload_and_process',
+            'file_name': file_name,
+            'file_data': file_base64
+        }
+        
+        print('🚀 Sending to Apps Script...')
+        await update.message.reply_text('🚀 Calling Apps Script...')
+        
+        # Send POST request
+        print(f'📡 POST to: {APPS_SCRIPT_URL}')
+        response = requests.post(
+            APPS_SCRIPT_URL,
+            json=payload,
+            headers={'Content-Type': 'application/json'},
+            timeout=60
         )
         
-        print("🚀 Calling Apps Script...")
+        print(f'📨 Response status: {response.status_code}')
+        print(f'📨 Response body: {response.text}')
         
-        try:
-            response = requests.post(
-                APPS_SCRIPT_URL,
-                json={
-                    'trigger': 'upload_and_process',
-                    'source': 'telegram_railway',
-                    'file_name': file_name,
-                    'file_data': file_base64
-                },
-                timeout=180
-            )
-            
-            print(f"📡 Response: {response.status_code}")
-            
-            if response.status_code == 200:
+        await update.message.reply_text(f'📨 Response: {response.status_code}')
+        
+        # Parse response
+        if response.status_code == 200:
+            try:
                 result = response.json()
-                status = result.get('status', 'unknown')
-                message = result.get('message', 'Done!')
+                message = result.get('message', 'Success!')
+                url = result.get('url', '')
                 
-                print(f"✅ Success: {message}")
+                reply = f'✅ Success: {message}'
+                if url:
+                    reply += f'\n\n🔗 Drive Link:\n{url}'
                 
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"✅ **Complete!**\n\n{message}",
-                    parse_mode='Markdown'
-                )
-            else:
-                print(f"⚠️ Status: {response.status_code}")
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"⚠️ Response: {response.status_code}",
-                    parse_mode='Markdown'
-                )
+                await update.message.reply_text(reply)
+                print(f'✅ Success: {message}')
+                
+            except Exception as e:
+                await update.message.reply_text(f'✅ Upload complete!\n\n{response.text}')
+        else:
+            error_msg = f'❌ Apps Script Error: {response.status_code}\n\n{response.text}'
+            await update.message.reply_text(error_msg)
+            print(f'❌ Error: {error_msg}')
         
-        except requests.exceptions.Timeout:
-            print("⏳ Timeout (file may still be processing)")
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="⏳ **Processing...**\n\nCheck Drive in 1-2 min!",
-                parse_mode='Markdown'
-            )
-        
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"❌ Error: {str(e)[:100]}",
-                parse_mode='Markdown'
-            )
-        
-        # Cleanup
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            print(f"🗑️ Cleaned: {file_path}\n")
-    
     except Exception as e:
-        print(f"❌ Handler Error: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        error = str(e)
+        print(f'❌ Exception: {error}')
+        await update.message.reply_text(f'❌ Error: {error}')
 
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle text messages"""
+    await update.message.reply_text(
+        '👋 Welcome to PDF BOT!\n\n'
+        '📄 Send me a PDF file and I will:\n'
+        '1. Upload it to Google Drive\n'
+        '2. Process it with AI\n\n'
+        '🤖 Bot is running on Railway.app'
+    )
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle commands"""
-    if update.effective_user.id != YOUR_USER_ID:
+def main():
+    """Start the bot"""
+    if not TELEGRAM_TOKEN:
+        print('❌ TELEGRAM_BOT_TOKEN not set!')
         return
     
-    text = update.message.text.lower()
+    if not APPS_SCRIPT_URL:
+        print('❌ APPS_SCRIPT_URL not set!')
+        return
     
-    if text in ['/start', 'hi', 'hello']:
-        await update.message.reply_text(
-            "👋 **PDF Bot - Railway**\n\n"
-            "📄 Send PDF → Auto upload to Drive!\n"
-            "🤖 Apps Script processes daily at 9 AM\n\n"
-            "🚀 24/7 Running on Railway.app!",
-            parse_mode='Markdown'
-        )
+    print('🚀 Building application...')
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    elif text == '/status':
-        await update.message.reply_text(
-            "✅ **Bot Status: Online**\n\n"
-            "🏃 Running on Railway.app\n"
-            "⚡ Ready to process PDFs!",
-            parse_mode='Markdown'
-        )
-
-
-# ============================================
-# MAIN
-# ============================================
-
-async def main():
-    """Initialize and run bot"""
+    print('📋 Adding handlers...')
+    # Handle PDF documents
+    app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
     
-    print("🚀 Starting bot...\n")
+    # Handle text messages
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Clear conflicts
-    clear_bot_conflicts()
+    print('🔥 PDF BOT STARTING...')
+    print('📡 Railway.app Telegram Bot - Ready!')
+    print(f'🔗 Apps Script URL configured')
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     
-    # Create app
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(MessageHandler(filters.Document.PDF, handle_document))
-    app.add_handler(MessageHandler(filters.TEXT, handle_text))
-    
-    print("✅ Bot initialized!")
-    print("⚡ BOT IS NOW RUNNING 24/7!\n")
-    
-    # Start
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
-    
-    # Keep alive
-    try:
-        while True:
-            await asyncio.sleep(1)
-    except KeyboardInterrupt:
-        print("\n🛑 Stopped")
-        await app.stop()
-
+    # Start polling
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True
+    )
 
 if __name__ == '__main__':
-    print("🔥 Railway.app Telegram Bot Starting...\n")
-    asyncio.run(main())
+    main()
