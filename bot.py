@@ -11,7 +11,7 @@ from telegram.ext import Application, MessageHandler, filters, CommandHandler, C
 
 # ===== CONFIG =====
 BOT_TOKEN = '8463828441:AAExeLSEkpCQre2FaWmLfz1VnTOKV_RGcH8'
-APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxiW8whVGhT1xc70xJcy3OdteSG13N3BlM7HkVXoLVIemfNzj83uUHUAm423GOzRECL/exec'
+APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzp7RTlBxILS7AbXOoAjVcxGqXCr4UVo8r3nvuRE6o9tDaID4BdZ4hWu6OmnI5-4_eK/exec'
 YOUR_USER_ID = 1345952228
 
 os.makedirs('downloads', exist_ok=True)
