@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Telegram PDF Bot - Railway.app (Final Production Version)
+Telegram PDF Bot - Railway.app (Final Stable Version)
 """
 
 import os
@@ -10,8 +10,8 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, CommandHandler, ContextTypes
 
 # ===== CONFIG =====
-BOT_TOKEN = 'YOUR_BOT_TOKEN'
-APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL'
+BOT_TOKEN = '8463828441:AAExeLSEkpCQre2FaWmLfz1VnTOKV_RGcH8'
+APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEB5Ddy4wV6LcSYb869YC4LJ2Pr8DC4oV53FpXJLQjagdndSGYUYT0tgVyG2nFgCUN/exec'
 YOUR_USER_ID = 1345952228
 
 os.makedirs('downloads', exist_ok=True)
@@ -22,8 +22,7 @@ os.makedirs('downloads', exist_ok=True)
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != YOUR_USER_ID:
         return
-
-    await update.message.reply_text("👋 PDF Bot Ready.\nSend a PDF.")
+    await update.message.reply_text("👋 PDF Bot Live.\nSend a PDF.")
 
 
 async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -39,7 +38,7 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         document = update.message.document
         file_name = document.file_name or f"{document.file_id}.pdf"
 
-        # ===== LIVE STATUS MESSAGE =====
+        # ===== SINGLE LIVE MESSAGE =====
         status_msg = await update.message.reply_text(
             f"📥 Downloading...\n{file_name}"
         )
@@ -109,7 +108,7 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         error_str = str(e)
 
-        # ===== CLEAN ERROR HANDLING =====
+        # Clean Gemini 429
         if "429" in error_str:
             clean_error = (
                 "Gemini API quota exceeded (429).\n"
