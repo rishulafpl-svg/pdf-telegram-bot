@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Telegram PDF Bot - Railway.app (Clean Final Version)
+Telegram PDF Bot - Railway.app (Final Production Version)
 """
 
 import os
@@ -10,15 +10,11 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, CommandHandler, ContextTypes
 
 # ===== CONFIG =====
-BOT_TOKEN = '8463828441:AAExeLSEkpCQre2FaWmLfz1VnTOKV_RGcH8'
-APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEB5Ddy4wV6LcSYb869YC4LJ2Pr8DC4oV53FpXJLQjagdndSGYUYT0tgVyG2nFgCUN/exec'
+BOT_TOKEN = 'YOUR_BOT_TOKEN'
+APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL'
 YOUR_USER_ID = 1345952228
 
 os.makedirs('downloads', exist_ok=True)
-
-print("="*60)
-print("🤖 PDF BOT - Railway (Clean)")
-print("="*60)
 
 
 # ===== HANDLERS =====
@@ -26,35 +22,34 @@ print("="*60)
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != YOUR_USER_ID:
         return
-    
-    await update.message.reply_text("👋 PDF Bot Ready. Send a PDF.")
+
+    await update.message.reply_text("👋 PDF Bot Ready.\nSend a PDF.")
 
 
 async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    file_name = None
+    status_msg = None
 
     try:
         if update.effective_user.id != YOUR_USER_ID:
             await update.message.reply_text("❌ Unauthorized")
             return
-        
+
         document = update.message.document
         file_name = document.file_name or f"{document.file_id}.pdf"
 
-        print(f"\n📥 New file: {file_name}")
-
-        # ===== SINGLE STATUS MESSAGE =====
+        # ===== LIVE STATUS MESSAGE =====
         status_msg = await update.message.reply_text(
             f"📥 Downloading...\n{file_name}"
         )
 
-        # Download
+        # ===== DOWNLOAD =====
         file = await context.bot.get_file(document.file_id)
         file_path = f"downloads/{file_name}"
         await file.download_to_drive(file_path)
 
-        print("✅ Downloaded")
-
-        # Encoding
+        # ===== ENCODE =====
         await status_msg.edit_text(
             f"🔄 Encoding...\n{file_name}"
         )
@@ -62,9 +57,7 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with open(file_path, 'rb') as f:
             file_base64 = base64.b64encode(f.read()).decode('utf-8')
 
-        print("✅ Encoded")
-
-        # Uploading
+        # ===== UPLOAD =====
         await status_msg.edit_text(
             f"☁️ Uploading to Drive...\n{file_name}"
         )
@@ -76,54 +69,78 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'file_name': file_name,
                 'file_data': file_base64
             },
-            headers={'Content-Type': 'application/json'},
             timeout=180
         )
 
-        print(f"📨 Status: {response.status_code}")
-
-        # Final result
-        if response.status_code == 200:
-            result = response.json()
-
-            if result.get("status") == "success":
-                # Replace the SAME message with final result
-                await status_msg.edit_text(result.get("message"))
-                print("✅ Success sent to Telegram")
-            else:
-                await status_msg.edit_text(
-                    f"❌ Error:\n{result.get('message')}"
-                )
-        else:
+        if response.status_code != 200:
             await status_msg.edit_text(
-                f"⚠️ Server Error {response.status_code}"
+                f"❌ Error processing:\n\n📄 {file_name}\n\nServer Error {response.status_code}"
             )
+            return
+
+        result = response.json()
+
+        if result.get("status") != "success":
+            await status_msg.edit_text(
+                f"❌ Error processing:\n\n📄 {file_name}\n\n{result.get('message')}"
+            )
+            return
+
+        # ===== SUCCESS =====
+        summary_link = result.get("docUrl") or (
+            f"https://docs.google.com/document/d/{result.get('docId')}"
+            if result.get("docId") else ""
+        )
+
+        final_message = (
+            f"✅ Success!\n\n"
+            f"📄 {file_name}\n"
+            f"Uploaded and summarized\n\n"
+            f"📘 Daily Summary:\n{summary_link}"
+        )
+
+        await status_msg.edit_text(final_message)
 
         # Cleanup
         if os.path.exists(file_path):
             os.remove(file_path)
-            print("🗑️ File cleaned")
 
     except Exception as e:
+
         error_str = str(e)
-        print("❌ Exception:", error_str)
-        await update.message.reply_text(f"❌ Error: {error_str[:200]}")
+
+        # ===== CLEAN ERROR HANDLING =====
+        if "429" in error_str:
+            clean_error = (
+                "Gemini API quota exceeded (429).\n"
+                "Check billing or reduce request frequency."
+            )
+        elif "401" in error_str:
+            clean_error = "Authentication error (401). Check API key."
+        else:
+            clean_error = error_str.split("\n")[0][:300]
+
+        final_error = (
+            f"❌ Error processing:\n\n"
+            f"📄 {file_name if file_name else 'Unknown File'}\n\n"
+            f"{clean_error}"
+        )
+
+        if status_msg:
+            await status_msg.edit_text(final_error)
+        else:
+            await update.message.reply_text(final_error)
 
 
 # ===== MAIN =====
 
 def main():
-
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
 
-    print("🚀 Bot Running...")
-    app.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True
-    )
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == '__main__':
