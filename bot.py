@@ -12,7 +12,9 @@ from telegram.ext import Application, MessageHandler, filters, CommandHandler, C
 # ===== CONFIG =====
 BOT_TOKEN = '8463828441:AAExeLSEkpCQre2FaWmLfz1VnTOKV_RGcH8'
 APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzEB5Ddy4wV6LcSYb869YC4LJ2Pr8DC4oV53FpXJLQjagdndSGYUYT0tgVyG2nFgCUN/exec'
-YOUR_USER_ID = 1345952228
+
+# ✅ Multiple allowed users
+ALLOWED_USERS = {1345952228, 1016594583}
 
 os.makedirs('downloads', exist_ok=True)
 
@@ -20,7 +22,7 @@ os.makedirs('downloads', exist_ok=True)
 # ===== HANDLERS =====
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != YOUR_USER_ID:
+    if update.effective_user.id not in ALLOWED_USERS:
         return
     await update.message.reply_text("👋 PDF Bot Live.\nSend a PDF.")
 
@@ -31,7 +33,7 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = None
 
     try:
-        if update.effective_user.id != YOUR_USER_ID:
+        if update.effective_user.id not in ALLOWED_USERS:
             await update.message.reply_text("❌ Unauthorized")
             return
 
@@ -108,7 +110,6 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         error_str = str(e)
 
-        # Clean Gemini 429
         if "429" in error_str:
             clean_error = (
                 "Gemini API quota exceeded (429).\n"
